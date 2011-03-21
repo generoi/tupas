@@ -11,12 +11,21 @@
  * @return array An array of permissions defined by the module
  *
  */
-function tupas_test_perm() {
-  return array('administer tupas_test, access tupas_test');
+function tupas_test_permission() {
+  return array(
+    'administer tupas_test' => array(
+      'title' => t('Administer TUPAS_test'),
+      'description' => t('Administer settings for TUPAS_test module'),
+    ),
+    'access tupas_test' => array(
+      'title' => t('Access TUPAS_test'),
+      'description' => t('Access TUPAS_test'),
+    ),
+  );
 }
 
 /**
- * Implementation of hook_menu()
+ * Implements hook_menu().
  *
  * Provides a list of menu items enabled by the module
  *
@@ -89,18 +98,15 @@ function tupas_front($transaction_id = '') {
     return drupal_set_message(t('You have already authenticated'), 'warning');
   }
 
-  $query = "SELECT * FROM {tupas_bank} WHERE enabled = 1";
-
-  $result = db_query($query);
+  $result = db_query("SELECT * FROM {tupas_bank} WHERE enabled = :enabled", array(':enabled' => 1));
 
   $banks = array();
 
-  while ($bank = db_fetch_array($result)) {
+  foreach ($result as $bank) {
     $banks[] = drupal_get_form('tupas_form', $bank, $transaction_id);
   }
 
-  // TODO use a proper theme/template
-  return theme('item_list', $banks);
+  return $banks;
 }
 
 /**
@@ -119,7 +125,7 @@ function tupas_test_return($bank_id, $transaction_id = '') {
 
     // do whatever you please with the data
 
-    return drupal_set_message('TUPAS authentication successful: '. $data['B02K_CUSTNAME'] .', '. $data['B02K_CUSTID']);
+    return drupal_set_message('TUPAS authentication successful: ' . $data['B02K_CUSTNAME'] . ', ' . $data['B02K_CUSTID']);
   }
   else {
     return drupal_set_message('TUPAS authentication failed', 'error');
@@ -154,6 +160,6 @@ function tupas_test_return_rej($transaction_id = '') {
  * @return string HTML output
  */
 function tupas_test() {
-  return theme_placeholder("You should see this only if you are a TUPAS authenticated user (or an admin).");
+  return drupal_placeholder("You should see this only if you are a TUPAS authenticated user (or an admin).");
 }
 

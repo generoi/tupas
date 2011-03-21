@@ -3,4 +3,6 @@ description = Module for testing the TUPAS authentication functionality
 dependencies[] = tupas
 package = TUPAS
 version = 0.1
-core = 6.x
+core = 7.x
+
+files[] = tupas_test.module

@@ -6,17 +6,30 @@
  */
 
 /**
- * Implemementation of hook_perm()
+ * Implemementation of hook_permission()
  *
  * @return array An array of permissions defined by the module
  *
  */
-function tupas_perm() {
-  return array('administer tupas', 'access tupas', 'access areas requiring tupas authentication');
+function tupas_permission() {
+  return array(
+    'administer tupas' => array(
+      'title' => t('Administer TUPAS'),
+      'description' => t('Administer settings for TUPAS authentication module'),
+    ),
+    'access tupas' => array(
+      'title' => t('Access TUPAS'),
+      'description' => t('Access TUPAS authentication'),
+    ),
+    'access areas requiring tupas authentication' => array(
+      'title' => t('Access areas requiring TUPAS authentication'),
+      'description' => t('Access areas requiring TUPAS authentication'),
+    ),
+  );
 }
 
 /**
- * Implementation of hook_menu()
+ * Implements hook_menu().
  *
  * Provides a list of menu items enabled by the module
  *
@@ -26,27 +39,49 @@ function tupas_perm() {
 function tupas_menu() {
 
   $items = array(
-    // general settings page
-    'admin/settings/tupas/general' => array(
-      'title' => 'TUPAS general settings',
+    // parent menu item
+    'admin/config/people/tupas' => array(
+      'title' => 'TUPAS authentication',
       'description' => 'General settings of the TUPAS authentication module',
       'page callback' => 'drupal_get_form',
       'page arguments' => array('tupas_settings_form'),
       'access arguments' => array('administer tupas'),
-      'type' => MENU_NORMAL_ITEM,
+    ),
+    // general settings page
+    'admin/config/people/tupas/general' => array(
+      'title' => 'General TUPAS settings',
+      'description' => 'General settings of the TUPAS authentication module',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('tupas_settings_form'),
+      'access arguments' => array('administer tupas'),
+      'type' => MENU_DEFAULT_LOCAL_TASK,
     ),
     // bank settings page
-    'admin/settings/tupas/banks' => array(
+    'admin/config/people/tupas/banks' => array(
       'title' => 'TUPAS bank settings',
       'description' => 'Settings of the banks enabled in the TUPAS authentication module',
       'page callback' => 'drupal_get_form',
       'page arguments' => array('tupas_bank_settings_form'),
       'access arguments' => array('administer tupas'),
-      'type' => MENU_NORMAL_ITEM,
+      'type' => MENU_LOCAL_TASK,
     ),
   );
 
   return $items;
+}
+
+/**
+ * Implementation of hook_forms()
+ */
+function tupas_forms($form_id, $args) {
+  $forms = array();
+  $banks = db_query("SELECT * FROM {tupas_bank} WHERE enabled = :enabled", array(':enabled' => 1));
+  foreach ($banks as $bank) {
+    $forms['tupas_form'.$bank->shortname] = array(
+      'callback' => 'tupas_form',
+    );
+  }
+  return $forms;
 }
 
 /**
@@ -59,9 +94,9 @@ function tupas_menu() {
  * @return array $form Form elements as an array
  *
  */
-function tupas_form($form_state, $bank, $transaction_id = '') {
+function tupas_form($form, &$form_state, $bank, $transaction_id = '') {
 
-  $form['#action'] = $bank['action_url'];
+  $form['#action'] = $bank->action_url;
 
   // message type (defaults to '701' on all banks)
   $form['A01Y_ACTION_ID'] = array(
@@ -72,13 +107,13 @@ function tupas_form($form_state, $bank, $transaction_id = '') {
   // version (depends on the bank)
   $form['A01Y_VERS'] = array(
     '#type' => 'hidden',
-    '#value' => $bank['cert_version'],
+    '#value' => $bank->cert_version,
   );
 
   // service provider
   $form['A01Y_RCVID'] = array(
     '#type' => 'hidden',
-    '#value' => $bank['rcv_id'],
+    '#value' => $bank->rcv_id,
   );
 
   // language code (by ISO 639 definition: FI = Finnish, SV = Swedish, EN = English)
@@ -110,7 +145,7 @@ function tupas_form($form_state, $bank, $transaction_id = '') {
   );
 
   // return link on success
-  $retlink = url(variable_get('authenticated_goto', 'tupas_test_return') .'/'. $bank['id'] .'/'. $transaction_id, array('absolute' => TRUE));
+  $retlink = url(variable_get('authenticated_goto', 'tupas_test_return') . '/' . $bank->id . '/' . $transaction_id, array('absolute' => TRUE));
 
   $form['A01Y_RETLINK'] = array(
     '#type' => 'hidden',
@@ -136,20 +171,20 @@ function tupas_form($form_state, $bank, $transaction_id = '') {
   // MAC key version
   $form['A01Y_KEYVERS'] = array(
     '#type' => 'hidden',
-    '#value' => $bank['keyvers'],
+    '#value' => $bank->keyvers,
   );
 
   // algorithm used to calculate the MAC (01 = MD5, 02 = SHA-1)
   $form['A01Y_ALG'] = array(
     '#type' => 'hidden',
-    '#value' => $bank['encryption_alg'],
+    '#value' => $bank->encryption_alg,
   );
 
   // build the string to calculate the MAC with
-  $macstring = "701&{$bank['cert_version']}&{$bank['rcv_id']}&FI&$stamp&$idtype&$retlink&$canlink&$rejlink&{$bank['keyvers']}&{$bank['encryption_alg']}&{$bank['rcv_key']}&";
+  $macstring = "701&{$bank->cert_version}&{$bank->rcv_id}&FI&$stamp&$idtype&$retlink&$canlink&$rejlink&{$bank->keyvers}&{$bank->encryption_alg}&{$bank->rcv_key}&";
 
   // calculate the MAC based on the encryption algorithm
-  if ($bank['encryption_alg'] == 01) {
+  if ($bank->encryption_alg == 01) {
     $mac = strtoupper(md5($macstring));
   }
   else {
@@ -164,19 +199,19 @@ function tupas_form($form_state, $bank, $transaction_id = '') {
 
   // submit button
   // if the bank has an image button
-  if ($bank['image_button'] != '') {
+  if ($bank->image_button != '') {
     $form['submit'] = array(
       '#type' => 'image_button',
-      '#title' => $bank['longname'],
-      '#value' => $bank['longname'],
-      '#src' => drupal_get_path('module', 'tupas') .'/images/'. $bank['image_button'],
+      '#title' => $bank->longname,
+      '#value' => $bank->longname,
+      '#src' => drupal_get_path('module', 'tupas') . '/images/' . $bank->image_button,
     );
   }
   // if not, use a normal button
   else {
     $form['submit'] = array(
       '#type' => 'submit',
-      '#value' => t($bank['longname']),
+      '#value' => t($bank->longname),
     );
   }
 
@@ -197,23 +232,18 @@ function tupas_form($form_state, $bank, $transaction_id = '') {
  */
 function tupas_return($bank_id, $transaction_id = '') {
 
-  $query = "SELECT rcv_key FROM {tupas_bank} WHERE id = %d";
-  $result = db_query($query, array($bank_id));
-
-  $result_array = db_fetch_array($result);
-
-  $rcv_key = $result_array['rcv_key'];
+  $rcv_key = db_query("SELECT rcv_key FROM {tupas_bank} WHERE id = :id", array(':id' => array($bank_id)))->fetchField();;
 
   $macstring = '';
 
   foreach ($_GET as $key => $value) {
     // drop q and the bank's MAC from the string
     if ($key != 'q' && $key != 'B02K_MAC') {
-      $macstring .= $value .'&';
+      $macstring .= $value . '&';
     }
   }
 
-  $macstring .= $rcv_key .'&';
+  $macstring .= $rcv_key . '&';
 
   // calculate the MAC based on the encryption algorithm
   if ($_GET['B02K_ALG'] == 01) {
@@ -229,24 +259,36 @@ function tupas_return($bank_id, $transaction_id = '') {
     global $user;
 
     // assign a role to the user
-    $query = "INSERT INTO {users_roles} (uid, rid) VALUES (%d, (SELECT rid FROM {role} WHERE name = 'tupas authenticated user'))";
-
-    db_query($query, array($user->uid));
+    $rid = db_query("SELECT rid FROM {role} WHERE name = 'tupas authenticated user'")->fetchField();
+    $id = db_insert('users_roles')
+    ->fields(array(
+      'uid' => $user->uid,
+      'rid' => $rid,
+    ))
+    ->execute();
 
     // set expiration timestamp
     if (variable_get('tupas_session_length', 30) != 0) {
 
-      $expiration_timestamp = time() + variable_get('tupas_session_length', 30) * 60;
+      $expiration_timestamp = REQUEST_TIME + variable_get('tupas_session_length', 30) * 60;
 
-      $query = "INSERT INTO {tupas_user} (uid, transaction_id, tupas_expiration_timestamp) VALUES (%d, %d, '%s')";
-
-      db_query($query, array($user->uid, $transaction_id, $expiration_timestamp));
+      $id = db_insert('tupas_user')
+      ->fields(array(
+        'uid' => $user->uid,
+        'transaction_id' => $transaction_id,
+        'tupas_expiration_timestamp' => $expiration_timestamp,
+      ))
+      ->execute();
     }
     else {
 
-      $query = "INSERT INTO {tupas_user} (uid, transaction_id, tupas_expiration_timestamp) VALUES (%d, %d, NULL)";
-
-      db_query($query, array($user->uid, $transaction_id));
+      $id = db_insert('tupas_user')
+      ->fields(array(
+        'uid' => $user->uid,
+        'transaction_id' => $transaction_id,
+        'tupas_expiration_timestamp' => NULL,
+      ))
+      ->execute();
     }
 
     return $_GET;
@@ -264,7 +306,7 @@ function tupas_return($bank_id, $transaction_id = '') {
  * @return array $form Form elements as an array
  *
  */
-function tupas_settings_form($form_state) {
+function tupas_settings_form($form, $form_state) {
 
   $form['tupas_session_length'] = array(
     '#type' => 'textfield',
@@ -321,7 +363,7 @@ function tupas_settings_form($form_state) {
  * @return array $form Form elements as an array
  *
  */
-function tupas_bank_settings_form($form_state) {
+function tupas_bank_settings_form($form, $form_state) {
 
   //TODO handle required fields
 
@@ -332,85 +374,83 @@ function tupas_bank_settings_form($form_state) {
     '#tree' => TRUE,
   );
 
-  $query = "SELECT * FROM {tupas_bank}";
+  $result = db_query("SELECT * FROM {tupas_bank}");
 
-  $result = db_query($query);
+  foreach ($result as $bank) {
 
-  while ($bank = db_fetch_array($result)) {
-
-    $form['banks'][$bank['shortname']] = array(
+    $form['banks'][$bank->shortname] = array(
       '#type' => 'fieldset',
-      '#title' => t($bank['longname']),
+      '#title' => t($bank->longname),
       '#collapsible' => TRUE,
       '#collapsed' => TRUE,
     );
 
-    $form['banks'][$bank['shortname']]['id'] = array(
+    $form['banks'][$bank->shortname]['id'] = array(
       '#type' => 'hidden',
-      '#value' => $bank['id'],
+      '#value' => $bank->id,
     );
 
-    $form['banks'][$bank['shortname']]['enabled'] = array(
+    $form['banks'][$bank->shortname]['enabled'] = array(
       '#type' => 'checkbox',
       '#title' => t('Enabled'),
-      '#default_value' => $bank['enabled'],
+      '#default_value' => $bank->enabled,
     );
 
-    $form['banks'][$bank['shortname']]['longname'] = array(
+    $form['banks'][$bank->shortname]['longname'] = array(
       '#type' => 'textfield',
       '#title' => t('Bank name'),
-      '#default_value' => $bank['longname'],
+      '#default_value' => $bank->longname,
     );
 
-    $form['banks'][$bank['shortname']]['shortname'] = array(
+    $form['banks'][$bank->shortname]['shortname'] = array(
       '#type' => 'textfield',
       '#title' => t('Machine readable name'),
-      '#default_value' => $bank['shortname'],
+      '#default_value' => $bank->shortname,
     );
 
-    $form['banks'][$bank['shortname']]['action_url'] = array(
+    $form['banks'][$bank->shortname]['action_url'] = array(
       '#type' => 'textfield',
       '#title' => t('Action URL'),
-      '#default_value' => $bank['action_url'],
+      '#default_value' => $bank->action_url,
     );
 
-    $form['banks'][$bank['shortname']]['cert_version'] = array(
+    $form['banks'][$bank->shortname]['cert_version'] = array(
       '#type' => 'textfield',
       '#title' => t('Certificate version (A01Y_VERS)'),
-      '#default_value' => $bank['cert_version'],
+      '#default_value' => $bank->cert_version,
     );
 
-    $form['banks'][$bank['shortname']]['rcv_id'] = array(
+    $form['banks'][$bank->shortname]['rcv_id'] = array(
       '#type' => 'textfield',
       '#title' => t('Receiver ID (A01Y_RCVID)'),
-      '#default_value' => $bank['rcv_id'],
+      '#default_value' => $bank->rcv_id,
     );
 
-    $form['banks'][$bank['shortname']]['rcv_key'] = array(
+    $form['banks'][$bank->shortname]['rcv_key'] = array(
       '#type' => 'textfield',
       '#title' => t('Receiver key'),
-      '#default_value' => $bank['rcv_key'],
+      '#default_value' => $bank->rcv_key,
     );
 
-    $form['banks'][$bank['shortname']]['keyvers'] = array(
+    $form['banks'][$bank->shortname]['keyvers'] = array(
       '#type' => 'textfield',
       '#title' => t('Key version (A01Y_KEYVERS)'),
-      '#default_value' => $bank['keyvers'],
+      '#default_value' => $bank->keyvers,
     );
 
-    $form['banks'][$bank['shortname']]['encryption_alg'] = array(
+    $form['banks'][$bank->shortname]['encryption_alg'] = array(
       '#type' => 'textfield',
       '#title' => t('Encryption algorithm (A01Y_ALG)'),
-      '#default_value' => $bank['encryption_alg'],
+      '#default_value' => $bank->encryption_alg,
     );
 
-    $form['banks'][$bank['shortname']]['image_button'] = array(
+    $form['banks'][$bank->shortname]['image_button'] = array(
       '#type' => 'textfield',
-      '#title' => t('Image button filename (put into '. drupal_get_path('module', 'tupas') .'/images)'),
-      '#default_value' => $bank['image_button'],
+      '#title' => t('Image button filename (put into ' . drupal_get_path('module', 'tupas') . '/images)'),
+      '#default_value' => $bank->image_button,
     );
 
-    $form['banks'][$bank['shortname']]['delete'] = array(
+    $form['banks'][$bank->shortname]['delete'] = array(
       '#type' => 'checkbox',
       '#title' => t('Delete'),
     );
@@ -505,9 +545,10 @@ function tupas_bank_settings_form_submit($form, &$form_state) {
 
     // if delete is checked
     if ($bank['delete'] == 1) {
-      $query = "DELETE FROM {tupas_bank} WHERE id = %d";
 
-      $result = db_query($query, array($bank['id']));
+      $result = db_delete('tupas_bank')
+      ->condition('id', $bank['id'])
+      ->execute();
 
       if (!$result) {
         drupal_set_message("Bank deletion failed", "error");
@@ -521,27 +562,46 @@ function tupas_bank_settings_form_submit($form, &$form_state) {
 
       //TODO update only if data has changed
 
-      $query = "UPDATE {tupas_bank} SET enabled = '%s', longname = '%s', shortname = '%s', action_url = '%s', cert_version = '%s', rcv_id = '%s', rcv_key = '%s', keyvers = '%s', encryption_alg = '%s', image_button = '%s' WHERE id = %d";
+      $result = db_update('tupas_bank')
+      ->fields(array(
+        'enabled' => $bank['enabled'],
+        'longname' => $bank['longname'],
+        'shortname' => $bank['shortname'],
+        'action_url' => $bank['action_url'],
+        'cert_version' => $bank['cert_version'],
+        'rcv_id' => $bank['rcv_id'],
+        'rcv_key' => $bank['rcv_key'],
+        'keyvers' => $bank['keyvers'],
+        'encryption_alg' => $bank['encryption_alg'],
+        'image_button' => $bank['image_button'],
+      ))
+      ->condition('id', $bank['id'], '=')
+      ->execute();
 
-      $result = db_query($query, array($bank['enabled'], $bank['longname'], $bank['shortname'], $bank['action_url'], $bank['cert_version'], $bank['rcv_id'], $bank['rcv_key'], $bank['keyvers'], $bank['encryption_alg'], $bank['image_button'], $bank['id']));
-
-      if (!$result) {
-        drupal_set_message("Saving failed", "error");
-      }
-      else {
-        drupal_set_message("Changes saved");
-      }
     }
   }
+  drupal_set_message("Changes saved");
 
   $new_bank = $form_state['values']['new_bank'];
 
   // if there is a new bank being added
   //TODO improve this
   if ($new_bank['shortname'] != '') {
-    $query = "INSERT INTO {tupas_bank} (enabled, longname, shortname, action_url, cert_version, rcv_id, rcv_key, keyvers, encryption_alg, image_button) VALUES ('%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s')";
 
-    $result = db_query($query, array($new_bank['enabled'], $new_bank['longname'], $new_bank['shortname'], $new_bank['action_url'], $new_bank['cert_version'], $new_bank['rcv_id'], $new_bank['rcv_key'], $new_bank['keyvers'], $new_bank['encryption_alg'], $new_bank['image_button']));
+    $result = $id = db_insert('tupas_bank')
+    ->fields(array(
+      'enabled' => $new_bank['enabled'],
+      'longname' => $new_bank['longname'],
+      'shortname' => $new_bank['shortname'],
+      'action_url' => $new_bank['action_url'],
+      'cert_version' => $new_bank['cert_version'],
+      'rcv_id' => $new_bank['rcv_id'],
+      'rcv_key' => $new_bank['rcv_key'],
+      'keyvers' => $new_bank['keyvers'],
+      'encryption_alg' => $new_bank['encryption_alg'],
+      'image_button' => $new_bank['image_button'],
+    ))
+    ->execute();
 
     if (!$result) {
       drupal_set_message("Adding new bank failed", "error");
@@ -553,7 +613,19 @@ function tupas_bank_settings_form_submit($form, &$form_state) {
 }
 
 /**
- * Implementation of hook_init()
+ * Implementation of hook_user()
+ *
+ */
+function tupas_user_logout($account) {
+
+  // remove TUPAS user
+  $result = db_delete('tupas_user')
+  ->condition('uid', $account->uid)
+  ->execute();
+}
+
+/**
+ * Implements hook_init().
  *
  * Does things on every pageload
  *
@@ -563,23 +635,30 @@ function tupas_init() {
   global $user;
 
   // if TUPAS authentication timestamp has been set and it has expired
-  $query = "SELECT tupas_expiration_timestamp FROM {tupas_user} WHERE uid = %d";
+  $tupas_expiration_timestamp = db_select('tupas_user', 'u')
+  ->fields('u', array('tupas_expiration_timestamp'))
+  ->condition('u.uid', $user->uid)
+  ->execute()
+  ->fetchField();
 
-  $result = db_query($query, array($user->uid));
+  if (!empty($tupas_expiration_timestamp) && REQUEST_TIME > $tupas_expiration_timestamp) {
 
-  $row = db_fetch_array($result);
-
-  if (isset($row['tupas_expiration_timestamp']) && time() > $row['tupas_expiration_timestamp']) {
+    $role_id = db_select('role', 'r')
+    ->fields('r', array('rid'))
+    ->condition('r.name', 'tupas authenticated user')
+    ->execute()
+    ->fetchField();  
 
     // remove the role from the user
-    $query = "DELETE FROM {users_roles} WHERE uid = %d AND rid = (SELECT rid FROM {role} WHERE name = 'tupas authenticated user')";
-
-    db_query($query, array($user->uid));
+    db_delete('users_roles')
+    ->condition('uid', $user->uid)
+    ->condition('rid', $role_id)
+    ->execute();
 
     // remove TUPAS user
-    $query = "DELETE FROM {tupas_user} WHERE uid = %d";
-
-    db_query($query, array($user->uid));
+    db_delete('tupas_user')
+    ->condition('uid', $user->uid)
+    ->execute();
 
     // show a warning message
     drupal_set_message(t('Your TUPAS authentication has expired'), 'warning');
@@ -590,44 +669,13 @@ function tupas_init() {
 }
 
 /**
- * Implementation of hook_user()
- *
+ * Implements hook_help().
  */
-function tupas_user($op, &$edit, &$account, $category = NULL) {
-
-  switch ($op) {
-
-    // tasks performed when the user logs out
-    case 'logout':
-
-      // remove the role from the user
-      $query = "DELETE FROM {users_roles} WHERE uid = %d AND rid = (SELECT rid FROM {role} WHERE name = 'tupas authenticated user')";
-
-      db_query($query, array($account->uid));
-
-      // remove TUPAS user
-      $query = "DELETE FROM {tupas_user} WHERE uid = %d";
-
-      db_query($query, array($account->uid));
-      break;
-
-    default:
-
-      // nothing here
-  }
-}
-
-/**
- * Implementation of hook_help()
- *
- * TODO make this work
- *
- */
-function tupas_help($section) {
-  switch ($section) {
+function tupas_help($path, $arg) {
+  switch ($path) {
     case 'admin/help#tupas':
       // Return a line-break version of the module README
-      return filter_filter('process', 2, NULL, file_get_contents(dirname(__FILE__) ."/README.txt"));
+      return check_markup(file_get_contents(dirname(__FILE__) . "/README.txt"));
   }
 }
 

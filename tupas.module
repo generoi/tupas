@@ -627,7 +627,7 @@ function tupas_init() {
     _tupas_remove_role($user);
 
     // Remove user's record from the tupas_user db table.
-    _tupas_user_delete($account);
+    _tupas_user_delete($user);
 
     // Show a warning message for the user.
     drupal_set_message(t('Your TUPAS authentication has expired.'), 'warning');

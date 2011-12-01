@@ -1,5 +1,4 @@
 name = TUPAS authentication
 description = Enables the TUPAS authentication functionality
 package = TUPAS
-version = 0.1
 core = 7.x

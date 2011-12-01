@@ -121,7 +121,6 @@ function tupas_front($transaction_id = '') {
 function tupas_test_return($bank_id, $transaction_id = '') {
 
   if ($data = tupas_return($bank_id, $transaction_id)) {
-    logg($data);
 
     // do whatever you please with the data
 

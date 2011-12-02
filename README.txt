@@ -52,11 +52,13 @@ Usage
 		
 Author
 ------
-Lauri Kolehmainen <lauri@exove.fi>
-
+Lauri Kolehmainen <http://drupal.org/user/436736>
+Juha Niemi <http://drupal.org/user/157732>
+Sampo Turve <http://drupal.org/user/669530>
 
 Credits
 -------
 Exove Ltd (www.exove.com)
 Vesa Palmu / Moana (www.moana.fi)
-The Finnish Red Cross (www.redcross.fi)
+The Finnish Red Cross (www.punainenristi.fi)
+Mearra (www.mearra.com)

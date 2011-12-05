@@ -323,6 +323,12 @@ function tupas_settings_form($form, $form_state) {
     '#default_value' => variable_get('tupas_session_length', 30),
     '#required' => TRUE,
   );
+  $form['tupas_session_expire_logout'] = array(
+    '#type' => 'checkbox',
+    '#title' => t("Break user's Tupas authentication on logout"),
+    '#description' => t('If selected, users need to re-authenticate after logging out if they want to access Tupas restricted features.'),
+    '#default_value' => variable_get('tupas_session_expire_logout', 1),
+  );
   $form['idtype'] = array(
     '#type' => 'textfield',
     '#title' => t('Identification type (A01Y_IDTYPE)'),
@@ -595,11 +601,13 @@ function tupas_bank_settings_form_submit($form, &$form_state) {
  * Remove the user from the tupas_bank table.
  */
 function tupas_user_logout($account) {
-  // Remove the Tupas authenticated role from the user.
-  _tupas_remove_role($account);
+  if (variable_get('tupas_session_expire_logout', 1) == 1) {
+    // Remove the Tupas authenticated role from the user.
+    _tupas_remove_role($account);
 
-  // Remove user's record from the tupas_user db table.
-  _tupas_user_delete($account);
+    // Remove user's record from the tupas_user db table.
+    _tupas_user_delete($account);
+  }
 }
 
 /**

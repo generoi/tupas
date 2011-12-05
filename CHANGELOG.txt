@@ -22,3 +22,12 @@ Images:
 - Added missing images for Handelsbanken, S-Pankki and Ålandsbanken.
 
 ----------
+
+05.12.2011
+
+tupas.module
+- Update to the general settings form and to the user logout function: Allow the admin to select whether or not user's
+  Tupas authentication should be terminated on logout.
+
+
+----------

@@ -86,6 +86,8 @@ function tupas_forms($form_id, $args) {
 function tupas_form($form, &$form_state, $bank, $transaction_id = '') {
   // Action URL.
   $form['#action'] = $bank->action_url;
+  // To help with the theming stuff.
+  $form['#attributes'] = array('class' => array('tupas-form'));
 
   // Message type (defaults to '701' on all banks).
   $form['A01Y_ACTION_ID'] = array(

@@ -29,5 +29,11 @@ tupas.module
 - Update to the general settings form and to the user logout function: Allow the admin to select whether or not user's
   Tupas authentication should be terminated on logout.
 
+----------
+
+08.12.2011
+
+tupas.module
+- Add 'tupas-form' classes into the Tupas forms to help with the theming.
 
 ----------
